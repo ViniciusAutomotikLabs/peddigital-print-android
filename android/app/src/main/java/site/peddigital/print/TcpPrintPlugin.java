@@ -1,15 +1,10 @@
 package site.peddigital.print;
 
-import android.util.Base64;
-
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -33,34 +28,12 @@ public class TcpPrintPlugin extends Plugin {
         }
 
         final int p = port == null ? 9100 : port;
-        final byte[] bytes;
-        try {
-            bytes = Base64.decode(data, Base64.DEFAULT);
-        } catch (IllegalArgumentException e) {
-            call.reject("base64 inválido: " + e.getMessage());
-            return;
-        }
-
         executor.execute(() -> {
-            Socket socket = null;
             try {
-                socket = new Socket();
-                socket.connect(new InetSocketAddress(host, p), 5000);
-                socket.setSoTimeout(5000);
-                OutputStream out = socket.getOutputStream();
-                out.write(bytes);
-                out.flush();
-                socket.close();
+                PrintUtil.sendBase64(host, p, data);
                 call.resolve();
             } catch (Exception e) {
                 call.reject("Falha ao imprimir em " + host + ":" + p + " — " + e.getMessage());
-            } finally {
-                if (socket != null) {
-                    try {
-                        socket.close();
-                    } catch (Exception ignored) {
-                    }
-                }
             }
         });
     }

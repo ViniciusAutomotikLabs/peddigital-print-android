@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from "./capacitor.js";
 import { buildTicket, toBase64 } from "./escpos.js";
 
 const TcpPrint = registerPlugin("TcpPrint");
+const LocalServer = registerPlugin("LocalServer");
 
 const MENU = [
   { id: "linguica", name: "Linguiça na chapa com pão", price: 31.99, station: "COZINHA", cat: "comida" },
@@ -16,6 +17,8 @@ const state = {
   filter: "all",
   cart: [],
   settings: loadSettings(),
+  server: null,
+  scanner: null,
 };
 
 const el = {
@@ -28,6 +31,10 @@ const el = {
   kitchenIp: document.getElementById("kitchen-ip"),
   barIp: document.getElementById("bar-ip"),
   agentInfo: document.getElementById("agent-info"),
+  qrUrl: document.getElementById("qr-url"),
+  qrCanvas: document.getElementById("qr-canvas"),
+  modeLabel: document.getElementById("mode-label"),
+  scanDialog: document.getElementById("scan-dialog"),
 };
 
 function loadSettings() {
@@ -50,6 +57,60 @@ function money(n) {
 function setStatus(msg, kind = "") {
   el.status.textContent = msg || "";
   el.status.className = `status ${kind}`.trim();
+}
+
+function applyQueryParams() {
+  const q = new URLSearchParams(location.search);
+  const mesa = q.get("mesa") || q.get("table");
+  const comanda = q.get("comanda") || q.get("order");
+  if (mesa) document.getElementById("mesa").value = mesa;
+  if (comanda) document.getElementById("comanda").value = comanda;
+
+  // peddigital://mesa/12
+  if (location.protocol === "peddigital:" || location.href.includes("peddigital://")) {
+    const m = location.href.match(/mesa\/([^/?#]+)/i);
+    if (m) document.getElementById("mesa").value = decodeURIComponent(m[1]);
+  }
+}
+
+function parseQrPayload(raw) {
+  const text = String(raw || "").trim();
+  try {
+    const data = JSON.parse(text);
+    return {
+      mesa: data.mesa || data.table || "",
+      comanda: data.comanda || data.order || "",
+    };
+  } catch {
+    /* not json */
+  }
+
+  if (/^https?:\/\//i.test(text) || text.includes("://")) {
+    try {
+      const url = new URL(text.replace(/^peddigital:/i, "https:"));
+      const mesa =
+        url.searchParams.get("mesa") ||
+        url.searchParams.get("table") ||
+        (url.pathname.match(/mesa\/([^/]+)/i) || [])[1] ||
+        "";
+      const comanda = url.searchParams.get("comanda") || url.searchParams.get("order") || "";
+      return { mesa: decodeURIComponent(mesa || ""), comanda: decodeURIComponent(comanda || "") };
+    } catch {
+      /* fallthrough */
+    }
+  }
+
+  const mesaMatch = text.match(/mesa\s*[:=#\/]?\s*([A-Za-z0-9_-]+)/i);
+  const comandaMatch = text.match(/comanda\s*[:=#\/]?\s*([A-Za-z0-9_-]+)/i);
+  if (mesaMatch || comandaMatch) {
+    return {
+      mesa: mesaMatch ? mesaMatch[1] : "",
+      comanda: comandaMatch ? comandaMatch[1] : "",
+    };
+  }
+
+  if (/^\d{1,3}$/.test(text)) return { mesa: text, comanda: "" };
+  return null;
 }
 
 function renderMenu() {
@@ -109,14 +170,29 @@ function splitTickets() {
     .map(([station, items]) => ({ station, items }));
 }
 
+function kitchenIp() {
+  return state.settings.kitchenIp || el.kitchenIp.value || "192.168.1.26";
+}
+
+function barIp() {
+  return state.settings.barIp || el.barIp.value || kitchenIp();
+}
+
 async function printNative(host, ticket) {
   const bytes = buildTicket(ticket);
-  await TcpPrint.send({
-    host,
-    port: 9100,
-    data: toBase64(bytes),
-  });
+  await TcpPrint.send({ host, port: 9100, data: toBase64(bytes) });
   return { station: ticket.station, host, bytes: bytes.length };
+}
+
+async function printViaHttp(body) {
+  const res = await fetch("/api/print", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || "Falha na impressão");
+  return data.results || [];
 }
 
 async function sendOrder() {
@@ -126,29 +202,33 @@ async function sendOrder() {
   setStatus("Imprimindo...");
   el.btnSend.disabled = true;
 
-  const mesa = document.getElementById("mesa").value.trim() || "12";
-  const comanda = document.getElementById("comanda").value.trim() || "T";
-  const note = document.getElementById("note").value.trim();
-  const kitchenIp = state.settings.kitchenIp || el.kitchenIp.value || "192.168.1.26";
-  const barIp = state.settings.barIp || el.barIp.value || kitchenIp;
+  const body = {
+    mesa: document.getElementById("mesa").value.trim() || "12",
+    comanda: document.getElementById("comanda").value.trim() || "T",
+    note: document.getElementById("note").value.trim(),
+    kitchenIp: kitchenIp(),
+    barIp: barIp(),
+    tickets,
+  };
 
   try {
-    if (!Capacitor.isNativePlatform()) {
-      throw new Error("Abra pelo APK Android para imprimir sem Mac.");
-    }
-
-    const results = [];
-    for (const ticket of tickets) {
-      const host = ticket.station === "BAR" ? barIp : kitchenIp;
-      results.push(
-        await printNative(host, {
-          station: ticket.station,
-          mesa,
-          comanda,
-          note,
-          items: ticket.items,
-        })
-      );
+    let results;
+    if (Capacitor.isNativePlatform()) {
+      results = [];
+      for (const ticket of tickets) {
+        const host = ticket.station === "BAR" ? body.barIp : body.kitchenIp;
+        results.push(
+          await printNative(host, {
+            station: ticket.station,
+            mesa: body.mesa,
+            comanda: body.comanda,
+            note: body.note,
+            items: ticket.items,
+          })
+        );
+      }
+    } else {
+      results = await printViaHttp(body);
     }
 
     setStatus(`Pronto! Impresso: ${results.map((r) => r.station).join(" + ")}`, "ok");
@@ -159,6 +239,115 @@ async function sendOrder() {
     setStatus(err.message || String(err), "err");
     el.btnSend.disabled = state.cart.length === 0;
   }
+}
+
+function drawQr(text) {
+  if (typeof qrcode !== "function") {
+    el.qrUrl.textContent = text;
+    return;
+  }
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  const size = 220;
+  const cells = qr.getModuleCount();
+  const ctx = el.qrCanvas.getContext("2d");
+  const scale = size / cells;
+  ctx.fillStyle = "#F6EFE4";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#632626";
+  for (let r = 0; r < cells; r++) {
+    for (let c = 0; c < cells; c++) {
+      if (qr.isDark(r, c)) ctx.fillRect(c * scale, r * scale, scale, scale);
+    }
+  }
+  el.qrUrl.textContent = text;
+}
+
+async function ensureServer() {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const st = await LocalServer.start({
+      port: 8787,
+      kitchenIp: kitchenIp(),
+      barIp: barIp(),
+      printerPort: 9100,
+    });
+    state.server = st;
+    return st;
+  } catch (err) {
+    console.warn(err);
+    return null;
+  }
+}
+
+async function refreshSettingsInfo() {
+  let info = "";
+  if (Capacitor.isNativePlatform()) {
+    const st = await ensureServer();
+    if (st?.running) {
+      info = `Servidor no ar · ${st.url}`;
+      const mesa = document.getElementById("mesa").value.trim() || "12";
+      const comanda = document.getElementById("comanda").value.trim() || "T1";
+      drawQr(`${st.url}/?mesa=${encodeURIComponent(mesa)}&comanda=${encodeURIComponent(comanda)}`);
+    } else {
+      info = "Não foi possível abrir o servidor local (porta 8787).";
+    }
+    el.modeLabel.textContent = "Android nativo · QR + ESC/POS";
+  } else {
+    info = "Cliente via Wi‑Fi · impressão no Android do salão";
+    el.modeLabel.textContent = "Aberto pelo QR · mesma Wi‑Fi";
+    try {
+      const res = await fetch("/api/health");
+      const data = await res.json();
+      info = `Conectado ao salão · ${data.url || data.lan}`;
+    } catch {
+      info = "Sem servidor de impressão neste endereço.";
+    }
+  }
+  el.agentInfo.textContent = info;
+}
+
+async function startScan() {
+  el.scanDialog.showModal();
+  if (!window.Html5Qrcode) {
+    setStatus("Scanner indisponível neste aparelho", "err");
+    return;
+  }
+  const scanner = new Html5Qrcode("qr-reader");
+  state.scanner = scanner;
+  try {
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 8, qrbox: 220 },
+      async (decoded) => {
+        const parsed = parseQrPayload(decoded);
+        if (!parsed) {
+          setStatus("QR não reconhecido", "err");
+          return;
+        }
+        if (parsed.mesa) document.getElementById("mesa").value = parsed.mesa;
+        if (parsed.comanda) document.getElementById("comanda").value = parsed.comanda;
+        setStatus(`Mesa ${parsed.mesa || "?"} carregada pelo QR`, "ok");
+        await stopScan();
+      }
+    );
+  } catch (err) {
+    setStatus("Permita a câmera para ler o QR", "err");
+  }
+}
+
+async function stopScan() {
+  try {
+    if (state.scanner) {
+      await state.scanner.stop();
+      await state.scanner.clear();
+    }
+  } catch {
+    /* ignore */
+  }
+  state.scanner = null;
+  if (el.scanDialog.open) el.scanDialog.close();
 }
 
 document.querySelectorAll(".tab").forEach((btn) => {
@@ -181,26 +370,27 @@ el.cartList.addEventListener("click", (e) => {
 });
 
 document.getElementById("btn-send").addEventListener("click", sendOrder);
+document.getElementById("btn-scan").addEventListener("click", startScan);
+document.getElementById("btn-close-scan").addEventListener("click", stopScan);
 
-document.getElementById("btn-settings").addEventListener("click", () => {
+document.getElementById("btn-settings").addEventListener("click", async () => {
   el.kitchenIp.value = state.settings.kitchenIp || "192.168.1.26";
   el.barIp.value = state.settings.barIp || "192.168.1.26";
-  el.agentInfo.textContent = Capacitor.isNativePlatform()
-    ? `Modo nativo OK · plataforma ${Capacitor.getPlatform()}`
-    : "Rode o APK no Android para TCP direto.";
+  await refreshSettingsInfo();
   el.settings.showModal();
 });
 
-document.getElementById("btn-save-settings").addEventListener("click", () => {
+document.getElementById("btn-save-settings").addEventListener("click", async () => {
   saveSettings({
     kitchenIp: el.kitchenIp.value.trim(),
     barIp: el.barIp.value.trim(),
   });
+  await ensureServer();
 });
 
-document.getElementById("mode-label").textContent = Capacitor.isNativePlatform()
-  ? `Android nativo · ESC/POS direto`
-  : `Preview web · precisa do APK para imprimir`;
-
+applyQueryParams();
 renderMenu();
 renderCart();
+ensureServer().then(() => {
+  refreshSettingsInfo();
+});

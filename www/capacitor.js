@@ -1,6 +1,17 @@
-/** Uses real Capacitor when injected by the Android WebView; stubs for browser preview. */
-
-function stubPlugin() {
+function stubPlugin(name) {
+  if (name === "LocalServer") {
+    return {
+      async start() {
+        return { running: false };
+      },
+      async stop() {
+        return { running: false };
+      },
+      async status() {
+        return { running: false };
+      },
+    };
+  }
   return {
     async send() {
       throw new Error("Abra pelo APK Android para imprimir (TCP nativo).");
@@ -25,5 +36,5 @@ export function registerPlugin(name) {
   if (window.Capacitor?.Plugins?.[name]) {
     return window.Capacitor.Plugins[name];
   }
-  return stubPlugin();
+  return stubPlugin(name);
 }

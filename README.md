@@ -1,28 +1,30 @@
-# PedDigital Print — Android APK
+# PedDigital Print — Android (QR + impressão)
 
-Impressão **ESC/POS direta** na Bematech (TCP `IP:9100`) **sem Mac**.
+APK que:
+1. Imprime ESC/POS na Bematech (TCP `9100`) **sem Mac**
+2. Sobe um **servidor Wi‑Fi** na porta `8787`
+3. Mostra **QR da mesa** para o cliente abrir o cardápio no celular
+4. Lê QR (botão **QR**) para carregar mesa/comanda
 
-## Android (este APK)
+## Fluxo
 
-1. Baixe o `app-debug.apk` do Actions (artifact `peddigital-print-debug`)
-2. No celular: permita instalar apps desconhecidos
-3. Instale, conecte na **mesma Wi‑Fi** da impressora
-4. Em ⚙ confira o IP (`192.168.1.26`) → Enviar e imprimir
-
-## iPhone — opções
-
-| Opção | Como |
-|--------|------|
-| **A · Recomendada no piloto** | Android parado na tomada = “estação de impressão”. Pedidos saem nele. iPhone só consulta/pede depois via web. |
-| **B · App iOS** | Mesmo Capacitor, build com Mac + Xcode + conta Apple Developer (TestFlight). |
-| **C · Android como servidor** | (próximo passo) APK sobe HTTP na LAN; iPhone abre o PWA nesse IP. |
-
-Navegador do iPhone **sozinho** não abre porta 9100 (limitação da Apple).
-
-## Build local (com Android Studio)
-
-```bash
-npm install
-npx cap sync android
-npx cap open android
 ```
+Cliente lê QR  →  http://IP_DO_ANDROID:8787/?mesa=12
+               →  monta pedido
+               →  Android imprime na Bematech
+```
+
+O Android fica na tomada, mesma Wi‑Fi da impressora.
+
+## Instalar
+
+Release: https://github.com/ViniciusAutomotikLabs/peddigital-print-android/releases
+
+1. Instale o APK  
+2. Abra o app (permite câmera se for ler QR)  
+3. ⚙ → copie/mostre o QR da mesa  
+4. No outro celular: leia o QR → peça → **Enviar e imprimir**
+
+## iPhone
+
+Abre o QR na Wi‑Fi do salão (Safari). Quem imprime é o **Android**; o iPhone só faz o pedido.
