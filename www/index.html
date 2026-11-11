@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#632626" />
+    <title>PedDigital Print</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <p class="eyebrow">PedDigital · Android</p>
+        <h1>Pedido → impressora</h1>
+        <p id="mode-label" class="hint-inline">Impressão direta ESC/POS (sem Mac)</p>
+      </div>
+      <button type="button" id="btn-settings" class="ghost" aria-label="Configurações">⚙</button>
+    </header>
+
+    <section class="meta">
+      <label>Mesa <input id="mesa" type="text" value="12" inputmode="numeric" /></label>
+      <label>Comanda <input id="comanda" type="text" value="T1" /></label>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab active" data-cat="all">Tudo</button>
+      <button type="button" class="tab" data-cat="comida">Comida</button>
+      <button type="button" class="tab" data-cat="bebida">Bebida</button>
+    </nav>
+
+    <main id="menu" class="menu"></main>
+
+    <section class="cart-panel">
+      <div class="cart-head">
+        <strong>Carrinho</strong>
+        <span id="cart-count">0</span>
+      </div>
+      <ul id="cart-list" class="cart-list"></ul>
+      <label class="note">Observação <input id="note" type="text" placeholder="Sem cebola, bem gelado..." /></label>
+      <button type="button" id="btn-send" class="primary" disabled>Enviar e imprimir</button>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <dialog id="settings">
+      <form method="dialog" class="settings-form">
+        <h2>Impressoras na Wi‑Fi</h2>
+        <p class="hint">O Android manda ESC/POS direto no IP (porta 9100). Sem Mac.</p>
+        <label>IP cozinha <input id="kitchen-ip" type="text" value="192.168.1.26" /></label>
+        <label>IP bar <input id="bar-ip" type="text" value="192.168.1.26" /></label>
+        <p id="agent-info" class="hint"></p>
+        <menu>
+          <button value="cancel" class="ghost">Fechar</button>
+          <button id="btn-save-settings" value="default" class="primary">Salvar</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

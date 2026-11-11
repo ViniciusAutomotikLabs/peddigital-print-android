@@ -1,0 +1,11 @@
+{
+  "appId": "site.peddigital.print",
+  "appName": "PedDigital Print",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
