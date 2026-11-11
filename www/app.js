@@ -134,6 +134,7 @@ async function ack(jobId, ok, error = "") {
     headers: {
       "Content-Type": "application/json",
       "x-agent-token": state.settings.agentToken,
+      "bypass-tunnel-reminder": "true",
     },
     body: JSON.stringify({ jobId, ok, error }),
   });
@@ -151,6 +152,7 @@ async function pollOnce() {
       headers: {
         "Content-Type": "application/json",
         "x-agent-token": state.settings.agentToken,
+        "bypass-tunnel-reminder": "true",
       },
       body: JSON.stringify({
         kitchenIp: state.settings.kitchenIp,
@@ -158,6 +160,7 @@ async function pollOnce() {
         name: "android-agent",
       }),
     });
+
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "Falha no heartbeat");
 
