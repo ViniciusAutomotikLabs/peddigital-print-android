@@ -11,9 +11,9 @@
   <body>
     <header class="top">
       <div>
-        <p class="eyebrow">PedDigital · QR + impressão</p>
-        <h1>Pedido → impressora</h1>
-        <p id="mode-label" class="hint-inline">Wi‑Fi do salão</p>
+        <p class="eyebrow">PedDigital · agente de impressão</p>
+        <h1>Cozinha / Bar</h1>
+        <p id="mode-label" class="hint-inline">Conectando à nuvem…</p>
       </div>
       <div class="top-actions">
         <button type="button" id="btn-scan" class="ghost">QR</button>
@@ -21,34 +21,22 @@
       </div>
     </header>
 
-    <section class="meta">
-      <label>Mesa <input id="mesa" type="text" value="12" inputmode="numeric" /></label>
-      <label>Comanda <input id="comanda" type="text" value="T1" /></label>
-    </section>
-
-    <nav class="tabs" role="tablist">
-      <button type="button" class="tab active" data-cat="all">Tudo</button>
-      <button type="button" class="tab" data-cat="comida">Comida</button>
-      <button type="button" class="tab" data-cat="bebida">Bebida</button>
-    </nav>
-
-    <main id="menu" class="menu"></main>
-
-    <section class="cart-panel">
+    <section class="cart-panel" style="margin-top:12px">
       <div class="cart-head">
-        <strong>Carrinho</strong>
+        <strong>Fila da nuvem</strong>
         <span id="cart-count">0</span>
       </div>
-      <ul id="cart-list" class="cart-list"></ul>
-      <label class="note">Observação <input id="note" type="text" placeholder="Sem cebola, bem gelado..." /></label>
-      <button type="button" id="btn-send" class="primary" disabled>Enviar e imprimir</button>
+      <ul id="job-list" class="cart-list"></ul>
       <p id="status" class="status" aria-live="polite"></p>
+      <p class="hint">Deixe este app aberto na Wi‑Fi da impressora. Clientes pedem pelo 4G/5G no QR da nuvem.</p>
     </section>
 
     <dialog id="settings">
       <form method="dialog" class="settings-form">
-        <h2>Salão + impressoras</h2>
-        <p class="hint">Android na tomada serve o cardápio na Wi‑Fi. Cliente lê o QR e pede; a impressão sai na Bematech.</p>
+        <h2>Nuvem + impressoras</h2>
+        <p class="hint">Cliente nunca entra na Wi‑Fi do salão. O Android só puxa jobs da nuvem e imprime na LAN.</p>
+        <label>URL da nuvem <input id="cloud-url" type="url" placeholder="https://...." /></label>
+        <label>Token do agente <input id="agent-token" type="text" /></label>
         <label>IP cozinha <input id="kitchen-ip" type="text" value="192.168.1.26" /></label>
         <label>IP bar <input id="bar-ip" type="text" value="192.168.1.26" /></label>
         <p id="agent-info" class="hint"></p>
@@ -65,9 +53,8 @@
 
     <dialog id="scan-dialog">
       <div class="settings-form">
-        <h2>Ler QR da mesa</h2>
+        <h2>Ler QR</h2>
         <div id="qr-reader" class="qr-reader"></div>
-        <p class="hint">Aponte para o QR (URL com mesa, peddigital://mesa/12, ou JSON).</p>
         <menu>
           <button type="button" id="btn-close-scan" class="ghost">Fechar</button>
         </menu>
